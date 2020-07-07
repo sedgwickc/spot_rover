@@ -24,6 +24,7 @@ class SpotControlReact
     ros::NodeHandle nh_;
     ros::NodeHandle nh_private_;
 
+    ros::Subscriber teleop_subscriber_;
     ros::Subscriber scan_subscriber_;
     ros::Subscriber pose_subscriber_;
     ros::Subscriber behaviour_subscriber_;
@@ -41,6 +42,9 @@ class SpotControlReact
 
     //void initParams();
     //void processScan(LDP& curr_ldp_scan, const ros::Time& time);
+
+    // scanCallback: stores lastest scan msg in latest_scan_
+    void teleopCallback (const geometry_msgs::Twist::ConstPtr& twist_msg);
 
     // scanCallback: stores lastest scan msg in latest_scan_
     void scanCallback (const sensor_msgs::LaserScan::ConstPtr& scan_msg);

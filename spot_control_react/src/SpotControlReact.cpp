@@ -17,6 +17,8 @@ SpotControlReact::SpotControlReact(ros::NodeHandle nh, ros::NodeHandle nh_privat
   cmd_vel_publisher_  = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 5);
   
   // setup subscribers
+  teleop_subscriber_ = nh_.subscribe("teleop/cmd_vel", 1, &SpotControlReact::teleopCallback, this);
+  
   scan_subscriber_ = nh_.subscribe("scan", 1, &SpotControlReact::scanCallback, this);
   
   pose_subscriber_ = nh_.subscribe("pose_stamped", 1, &SpotControlReact::poseCallback, this);
@@ -35,6 +37,14 @@ void SpotControlReact::poseCallback (const geometry_msgs::PoseStamped::ConstPtr&
     // store pose message in curr_pose_
     this->curr_pose_.pose = pose_msg->pose;
     this->curr_pose_.header = pose_msg->header;
+}
+
+void SpotControlReact::teleopCallback (const geometry_msgs::Twist::ConstPtr& twist_msg){
+
+    //if safe than publish twist_msg to cmd_vel
+    if(safeToMove()){
+        cmd_vel_publisher_.publish(twist_msg);
+    }
 }
 
 void SpotControlReact::scanCallback (const sensor_msgs::LaserScan::ConstPtr& scan_msg){
@@ -132,7 +142,7 @@ void SpotControlReact::scanCallback (const sensor_msgs::LaserScan::ConstPtr& sca
 bool SpotControlReact::safeToMove(){
 
     // the front of the rover (green axis in rviz config) is aligned with the y-axis of the rover
-    return false;
+    return true;
 
 }
 
