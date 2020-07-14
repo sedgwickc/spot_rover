@@ -9,6 +9,9 @@
     <arg name="use_rviz" default="true" />
     <arg name="publish_covariance" default="false"/>
     
+    <node pkg="spot_base_controller" type="spot_base_controller" name="spot_base_controller" output="screen">
+    </node>
+    
     <node name="imu_pub_node" pkg="bbblue_drivers" type="imu_pub_node" respawn="true">
         <param name="frame_id" value="$(arg frame_id)" />
         <param name="linear_acceleration_stddev" value="$(arg linear_acceleration_stddev)" />
