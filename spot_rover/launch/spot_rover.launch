@@ -55,5 +55,10 @@
     
     <node pkg="spot_control_react" type="spot_control_react_node" name="spot_control_react_node" output="screen">
     </node>
+
+	<node name="pixy_node" pkg="pixy_node" type="pixy_node" ns="my_pixy" output="screen">
+		<param name="use_servos" value="false" />
+		<param name="rate" value="50.0" />
+	</node>
   
 </launch>
