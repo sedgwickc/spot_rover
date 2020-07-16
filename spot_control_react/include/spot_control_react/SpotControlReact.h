@@ -11,6 +11,16 @@
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <spot_control_react/Behaviour.h>
+
+// BEHAVE_TYPE: enum that stores indexes for supported behaviour types
+enum BEHAVE_TYPE{ 
+    MOVE,
+    WANDER,
+    EXPLORE,
+    WAIT,
+    SCAN
+    };
 
 class SpotControlReact
 {
@@ -33,7 +43,8 @@ class SpotControlReact
 
     // set by scanCallback, accessed by safeToMove()
     sensor_msgs::LaserScan latest_scan_;
-    //TODO: current behaviour
+    //current behaviour
+    spot_control_react::Behaviour curr_behaviour_;
     //TODO: list of past behaviours?
     //TODO: list of outstanding/upcoming behaviours
     geometry_msgs::PoseStamped curr_pose_;
@@ -51,6 +62,9 @@ class SpotControlReact
 
     // poseCallback: stores current pose in curr_pose_
     void poseCallback (const geometry_msgs::PoseStamped::ConstPtr& pose_msg);
+    
+    // behaviourCallback: stores current behaviour in curr_behaviour_
+    void behaviourCallback (const spot_control_react::Behaviour::ConstPtr& behaviour_msg);
 
     float euclidian_distance(geometry_msgs::PoseStamped goal_pose_, geometry_msgs::PoseStamped curr_pose);
     float linear_vel(geometry_msgs::PoseStamped goal_pose_, float constant);
@@ -58,9 +72,15 @@ class SpotControlReact
     float angular_vel(geometry_msgs::PoseStamped goal_pose_, float constant);
     void moveToGoal();
 
-    /* safeToMove(): uses current pose and laserScan data to determine if there 
+    /* safeToMoveForeward(): uses latest laserScan data to determine if there 
      * is an obstacle in front of the rover */
-    bool safeToMove();
+    bool safeToMoveForward();
+
+    /* safeToMoveBackward(): uses latest laserScan data to determine if there 
+     * is an obstacle behind the rover */
+    bool safeToMoveBackward();
+
+    void performBehaviour();
 };
 
 #endif // LASER_SCAN_MATCHER_LASER_SCAN_MATCHER_H

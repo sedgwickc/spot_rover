@@ -14,16 +14,17 @@ SpotControlReact::SpotControlReact(ros::NodeHandle nh, ros::NodeHandle nh_privat
   // state variables
 
   // setup publishers
-  cmd_vel_publisher_  = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 5);
+  cmd_vel_publisher_  = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 10);
   
   // setup subscribers
-  teleop_subscriber_ = nh_.subscribe("teleop/cmd_vel", 1, &SpotControlReact::teleopCallback, this);
+  teleop_subscriber_ = nh_.subscribe("teleop/cmd_vel", 10, &SpotControlReact::teleopCallback, this);
   
   scan_subscriber_ = nh_.subscribe("scan", 1, &SpotControlReact::scanCallback, this);
   
   pose_subscriber_ = nh_.subscribe("pose_stamped", 1, &SpotControlReact::poseCallback, this);
+  
+  behaviour_subscriber_ = nh_.subscribe("behaviour", 1, &SpotControlReact::behaviourCallback, this);
     
-  //TODO: subscribe to behaviour topic
   
 }
 
@@ -42,7 +43,14 @@ void SpotControlReact::poseCallback (const geometry_msgs::PoseStamped::ConstPtr&
 void SpotControlReact::teleopCallback (const geometry_msgs::Twist::ConstPtr& twist_msg){
 
     //if safe than publish twist_msg to cmd_vel
-    if(safeToMove()){
+    // issue(?): multiple instances of teleopCallback executing at a time due to speed of laser
+    if(twist_msg->linear.x > 0.0){
+        if(safeToMoveForward())
+            cmd_vel_publisher_.publish(twist_msg);
+    } else if(twist_msg->linear.x < 0.0){
+        if(safeToMoveBackward())
+            cmd_vel_publisher_.publish(twist_msg);
+    } else {
         cmd_vel_publisher_.publish(twist_msg);
     }
 }
@@ -55,6 +63,10 @@ void SpotControlReact::scanCallback (const sensor_msgs::LaserScan::ConstPtr& sca
     this->latest_scan_.range_min = scan_msg->range_min;
     this->latest_scan_.range_max = scan_msg->range_max;
     this->latest_scan_.ranges = scan_msg->ranges;
+}
+
+void SpotControlReact::behaviourCallback (const spot_control_react::Behaviour::ConstPtr& behaviour_msg){
+    this->curr_behaviour_.type = behaviour_msg->type;
 }
 
 //void SpotControlReact::processScan(sensor_msgs::LaserScan::ConstPtr, const ros::Time& time){
@@ -135,15 +147,44 @@ void SpotControlReact::scanCallback (const sensor_msgs::LaserScan::ConstPtr& sca
  // ROS_DEBUG("Scan matcher total duration: %.1f ms", dur);
 //}
 
-/* safeToMove()
- * This method used the latest scan stored in latest_scan to determine if the area in front of the rover is blocked within
- * a certain range. The method returns true if area not blocked, false otherwise 
+/* safeToMoveForward()
+ * This method used the latest scan stored in latest_scan to determine if the area in front of the rover is blocked
+ * within a certain range. The method returns true if area not blocked, false otherwise 
  */ 
-bool SpotControlReact::safeToMove(){
+bool SpotControlReact::safeToMoveForward(){
 
     // the front of the rover (green axis in rviz config) is aligned with the y-axis of the rover
-    return true;
+    // index into ranges for front of rover is 539
+    // store latest scan in a local variable to avoid issues when latest scan updated by callback?
 
+    // if moving forward, check a 90 deg field of view from front therefore the range 539-(91), 539+91 must be 
+    //checked to ensure the range values are > 0.15m
+    for(int i = 448; i <= 630; i++){
+        if(latest_scan_.ranges[i] < 0.16){
+            ROS_INFO("Forward: not safe! ");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/* safeToMoveBackward()
+ * This method used the latest scan stored in latest_scan to determine if the area behind the rover is blocked
+ * within a certain range. The method returns true if area not blocked, false otherwise 
+ */ 
+bool SpotControlReact::safeToMoveBackward(){
+
+    // store latest scan in a local variable to avoid issues when latest scan updated by callback?
+
+    for(int i = 89; i <= 269; i++){
+        if(latest_scan_.ranges[i] < 0.16){
+            ROS_INFO("Backward: not safe! ");
+            return false;
+        }
+    }
+
+    return true;
 }
 
 float SpotControlReact::euclidian_distance(geometry_msgs::PoseStamped goal_pose, geometry_msgs::PoseStamped curr_pose){
@@ -168,5 +209,17 @@ float SpotControlReact::angular_vel(geometry_msgs::PoseStamped goal_pose_, float
 }
 
 void SpotControlReact::moveToGoal(){
+
+}
+
+void SpotControlReact::performBehaviour(){
+
+    if( this->curr_behaviour_.type == MOVE ){
+        ROS_INFO("peforming MOVE behaviour");
+    } else if( this->curr_behaviour_.type == WANDER ){
+        ROS_INFO("peforming WANDER behaviour");
+
+    }
+        
 
 }
