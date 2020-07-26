@@ -3,29 +3,29 @@
  * Licence: GPL
  */
 
+#include <cmath>
 #include <spot_control_react/SpotControlReact.h>
 
 SpotControlReact::SpotControlReact(ros::NodeHandle nh, ros::NodeHandle nh_private):
   nh_(nh),
-  nh_private_(nh_private)
+  nh_private_(nh_private),
+  curr_pose_(),
+  goal_pose_(),
+  curr_behaviour_()
 {
   ROS_INFO("Starting SpotControlReact");
 
-  // state variables
-
   // setup publishers
-  cmd_vel_publisher_  = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 10);
+  this->cmd_vel_publisher_  = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 10);
   
   // setup subscribers
-  teleop_subscriber_ = nh_.subscribe("teleop/cmd_vel", 10, &SpotControlReact::teleopCallback, this);
+  this->teleop_subscriber_ = nh_.subscribe("teleop/cmd_vel", 10, &SpotControlReact::teleopCallback, this);
   
-  scan_subscriber_ = nh_.subscribe("scan", 1, &SpotControlReact::scanCallback, this);
+  this->scan_subscriber_ = nh_.subscribe("scan", 1, &SpotControlReact::scanCallback, this);
   
-  pose_subscriber_ = nh_.subscribe("pose_stamped", 1, &SpotControlReact::poseCallback, this);
+  this->pose_subscriber_ = nh_.subscribe("pose_stamped", 1, &SpotControlReact::poseCallback, this);
   
-  behaviour_subscriber_ = nh_.subscribe("behaviour", 1, &SpotControlReact::behaviourCallback, this);
-    
-  
+  this->behaviour_subscriber_ = nh_.subscribe("behaviour", 1, &SpotControlReact::behaviourCallback, this);
 }
 
 SpotControlReact::~SpotControlReact()
@@ -34,10 +34,16 @@ SpotControlReact::~SpotControlReact()
 }
 
 void SpotControlReact::poseCallback (const geometry_msgs::PoseStamped::ConstPtr& pose_msg){
-
-    // store pose message in curr_pose_
-    this->curr_pose_.pose = pose_msg->pose;
-    this->curr_pose_.header = pose_msg->header;
+    
+    // only update pose if change in pose seems reasonable (ie difference in position is less than 10 cm)
+    if( abs(curr_pose_.pose.position.x - pose_msg->pose.position.x) < .1 && 
+        abs(curr_pose_.pose.position.y - pose_msg->pose.position.y) < .1){
+        // store pose message in curr_pose_
+        this->curr_pose_.pose = pose_msg->pose;
+        this->curr_pose_.header = pose_msg->header;
+        this->curr_pose_.pose.position.x = round(this->curr_pose_.pose.position.x * 1000.0)/1000.0;
+        this->curr_pose_.pose.position.y = round(this->curr_pose_.pose.position.y * 1000.0)/1000.0;
+    }
 }
 
 void SpotControlReact::teleopCallback (const geometry_msgs::Twist::ConstPtr& twist_msg){
@@ -67,85 +73,18 @@ void SpotControlReact::scanCallback (const sensor_msgs::LaserScan::ConstPtr& sca
 
 void SpotControlReact::behaviourCallback (const spot_control_react::Behaviour::ConstPtr& behaviour_msg){
     this->curr_behaviour_.type = behaviour_msg->type;
+    
+    switch(this->curr_behaviour_.type){
+        case MOVE:
+            break;
+        case MOVETO:
+            this->moveToGoal(behaviour_msg->goal_pose);
+            break;
+        default: 
+            ROS_INFO("Behaviour type no supported!");
+            break;
+        }
 }
-
-//void SpotControlReact::processScan(sensor_msgs::LaserScan::ConstPtr, const ros::Time& time){
-
- // ros::WallTime start = ros::WallTime::now();
-
- // // CSM is used in the following way:
- // // The scans are always in the laser frame
- // // The reference scan (prevLDPcan_) has a pose of [0, 0, 0]
- // // The new scan (currLDPScan) has a pose equal to the movement
- // // of the laser in the laser frame since the last scan
- // // The computed correction is then propagated using the tf machinery
-
- // prev_ldp_scan_->odometry[0] = 0.0;
- // prev_ldp_scan_->odometry[1] = 0.0;
- // prev_ldp_scan_->odometry[2] = 0.0;
-
- // prev_ldp_scan_->estimate[0] = 0.0;
- // prev_ldp_scan_->estimate[1] = 0.0;
- // prev_ldp_scan_->estimate[2] = 0.0;
-
- // prev_ldp_scan_->true_pose[0] = 0.0;
- // prev_ldp_scan_->true_pose[1] = 0.0;
- // prev_ldp_scan_->true_pose[2] = 0.0;
-
- // input_.laser_ref  = prev_ldp_scan_;
- // input_.laser_sens = curr_ldp_scan;
-
- // // **** estimated change since last scan
-
- // double dt = (time - last_icp_time_).toSec();
- // double pr_ch_x, pr_ch_y, pr_ch_a;
- // getPrediction(pr_ch_x, pr_ch_y, pr_ch_a, dt);
-
- // // the predicted change of the laser's position, in the fixed frame
-
- // tf::Transform pr_ch;
- // createTfFromXYTheta(pr_ch_x, pr_ch_y, pr_ch_a, pr_ch);
-
- // // account for the change since the last kf, in the fixed frame
-
- // pr_ch = pr_ch * (f2b_ * f2b_kf_.inverse());
-
- // // the predicted change of the laser's position, in the laser frame
-
- // tf::Transform pr_ch_l;
- // pr_ch_l = laser_to_base_ * f2b_.inverse() * pr_ch * f2b_ * base_to_laser_ ;
-
- // input_.first_guess[0] = pr_ch_l.getOrigin().getX();
- // input_.first_guess[1] = pr_ch_l.getOrigin().getY();
- // input_.first_guess[2] = tf::getYaw(pr_ch_l.getRotation());
-
- // // If they are non-Null, free covariance gsl matrices to avoid leaking memory
- // if (output_.cov_x_m)
- // {
- //   gsl_matrix_free(output_.cov_x_m);
- //   output_.cov_x_m = 0;
- // }
- // if (output_.dx_dy1_m)
- // {
- //   gsl_matrix_free(output_.dx_dy1_m);
- //   output_.dx_dy1_m = 0;
- // }
- // if (output_.dx_dy2_m)
- // {
- //   gsl_matrix_free(output_.dx_dy2_m);
- //   output_.dx_dy2_m = 0;
- // }
-
- // // *** scan match - using point to line icp from CSM
-
- // sm_icp(&input_, &output_);
- // tf::Transform corr_ch;
-
- // // **** statistics
-
- // double dur = (ros::WallTime::now() - start).toSec() * 1e3;
- // ROS_DEBUG("Scan matcher total duration: %.1f ms", dur);
-//}
 
 /* safeToMoveForward()
  * This method used the latest scan stored in latest_scan to determine if the area in front of the rover is blocked
@@ -187,39 +126,114 @@ bool SpotControlReact::safeToMoveBackward(){
     return true;
 }
 
-float SpotControlReact::euclidian_distance(geometry_msgs::PoseStamped goal_pose, geometry_msgs::PoseStamped curr_pose){
-    return 0.0;
+float SpotControlReact::euclidian_distance(geometry_msgs::PoseStamped goal_pose){
+    return sqrt(pow(goal_pose.pose.position.x - this->curr_pose_.pose.position.x, 2) +
+                pow(goal_pose.pose.position.y - this->curr_pose_.pose.position.y, 2));
+}
+
+/* linear_vel()
+ * Uses the distance of the rover from a goal_pose to calculate the linear velocity used to achieve goal_pose
+ * The tanh function is used to normalize the distance to the range [0,1]
+ * The constant is used to scale the output of tanh to limit the maximum velocity
+ */
+float SpotControlReact::linear_vel(geometry_msgs::PoseStamped goal_pose, float constant){
+    // normalize distance to a value between 0 and 1 for use as velocity
+    // tanh used as normalization function as range of tanh(x) is [0, 1) for x >= 1
+    // the input to tanh is scaled up to increase the rate at which the function increases to its max value
+    return constant * tanh(20*this->euclidian_distance(goal_pose));
+}
+
+float SpotControlReact::steering_angle(geometry_msgs::PoseStamped goal_pose){
+   double roll, pitch, yaw; 
+   double angle_to_goal;
+   tf::Quaternion q(this->curr_pose_.pose.orientation.x, 
+      this->curr_pose_.pose.orientation.y, 
+      this->curr_pose_.pose.orientation.z, 
+      this->curr_pose_.pose.orientation.w); 
+   tf::Matrix3x3 m(q);
+
+   // the yaw value is used when determining angular velocity
+   m.getRPY(roll, pitch, yaw);
+   angle_to_goal = atan2(goal_pose.pose.position.y - this->curr_pose_.pose.position.y,
+        goal_pose.pose.position.x - this->curr_pose_.pose.position.x);
+   return angle_to_goal - yaw;
 
 }
 
-
-float SpotControlReact::linear_vel(geometry_msgs::PoseStamped goal_pose_, float constant){
-    return 0.0;
-
+/* angular_vel()
+ * Uses the steering angle calculated using the goal_pose is used to determine the angular velocity to use to achieve 
+ * the goal_pose.
+ * The tanh function is used to normalize the steering angle to the range [0,1]
+ * The constant is used to scale the output of tanh to limit the maximum velocity
+ */
+float SpotControlReact::angular_vel(geometry_msgs::PoseStamped goal_pose, float constant){
+    // normalize distance to a value between 0 and 1 for use as angular velocity
+    // tanh used as normalization function as range of tanh(x) is [0, 1) for x >= 1
+    // the input to tanh is scaled up to increase the rate at which the function increases to its max value
+    return constant * tanh(20*this->steering_angle(goal_pose));
 }
 
-float SpotControlReact::steering_angle(geometry_msgs::PoseStamped goal_pose_){
-    return 0.0;
+void SpotControlReact::moveToGoal(geometry_msgs::PoseStamped goal_pose){
 
+   float distance_tolerance = DISTANCE_TOLERANCE; 
+   ros::Rate rate(10);
+   //TODO: parameterize these values for easy tuning
+   // constant values represent max value that can be achieved for velocity (since constant is used to a scale a value
+   // in range [0,1]
+   float angular_constant = 0.1;
+   float linear_constant = 0.13;
+   float lin_vel = 0.0;
+   float ang_vel = 0.0;
+   float euclidian_dist = 0.0;
+   float steering_ang = 0.0;
+   bool at_goal = false;
+    
+
+   geometry_msgs::Twist vel_msg;
+
+   ROS_INFO("Moving toward goal");
+   euclidian_dist = this->euclidian_distance(goal_pose);
+   while (at_goal == false){
+        // angular velocity in the z-axis
+        steering_ang = steering_angle(goal_pose);
+        // angle tolerance: 3 deg/ 0.05 rad
+        if ( abs(steering_ang) >= 0.05){
+            lin_vel = 0.0;
+            ang_vel = 0.1;
+            //ang_vel = this->angular_vel(goal_pose, angular_constant);
+            if(steering_ang < 0)
+                ang_vel = -ang_vel;
+            vel_msg.linear.x = lin_vel;
+            vel_msg.angular.x = 0.0;
+            vel_msg.angular.y = 0.0;
+            vel_msg.angular.z = ang_vel;
+        } else if( abs(euclidian_dist) > distance_tolerance){
+            // linear velocity in x-axis
+            ang_vel = 0.0;
+            vel_msg.angular.z = ang_vel;
+            lin_vel = this->linear_vel(goal_pose, linear_constant);
+            vel_msg.linear.x = -lin_vel;
+            vel_msg.linear.y = 0.0;
+            vel_msg.linear.z = 0.0;
+        }
+
+        // TODO: add object avoidance logic
+        this->cmd_vel_publisher_.publish(vel_msg);
+
+        rate.sleep();
+        ROS_INFO("distance to goal: %f, Steer_ang: %f, Ang_vel: %f", euclidian_dist, steering_ang, ang_vel);
+        ROS_INFO("lin_vel: %f", lin_vel);
+        ros::spinOnce(); // process callbacks once for latest pose data
+        euclidian_dist = this->euclidian_distance(goal_pose);
+        if(abs(euclidian_dist) <= distance_tolerance){
+            at_goal = true;
+        }
+   }
+
+   ROS_INFO("Goal reached. Stopping");
+   // bring rover to stop 
+   vel_msg.linear.x = 0.0;
+   vel_msg.angular.z = 0.0;
+   this->cmd_vel_publisher_.publish(vel_msg);
 }
 
-float SpotControlReact::angular_vel(geometry_msgs::PoseStamped goal_pose_, float constant){
-    return 0.0;
-
-}
-
-void SpotControlReact::moveToGoal(){
-
-}
-
-void SpotControlReact::performBehaviour(){
-
-    if( this->curr_behaviour_.type == MOVE ){
-        ROS_INFO("peforming MOVE behaviour");
-    } else if( this->curr_behaviour_.type == WANDER ){
-        ROS_INFO("peforming WANDER behaviour");
-
-    }
-        
-
-}
