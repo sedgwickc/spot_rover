@@ -1,0 +1,16 @@
+<launch> 
+
+    <node name="behaviour_move_test" pkg="rostopic" type="rostopic" args="pub -1 behaviour spot_control_react/Behaviour
+    '{type: 1, 
+    movement:{
+        header:{seq: 0, stamp: {secs: 0, nsecs: 0},frame_id: ''},
+        twist:{ linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}},
+    duration: 0,
+    source: 0,
+    goal_pose:{ 
+        header: {seq: 0, stamp: {secs: 0, nsecs: 0}, frame_id: ''},
+        pose: {position: {x: 0.32, y: 0.17, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.99}}}
+    }'" output="screen">
+    </node>
+
+</launch>
