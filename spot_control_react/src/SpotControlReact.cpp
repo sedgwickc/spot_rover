@@ -156,6 +156,7 @@ float SpotControlReact::steering_angle(geometry_msgs::PoseStamped goal_pose){
    m.getRPY(roll, pitch, yaw);
    angle_to_goal = atan2(goal_pose.pose.position.y - this->curr_pose_.pose.position.y,
         goal_pose.pose.position.x - this->curr_pose_.pose.position.x);
+   //ROS_INFO("angle to goal: %f, yaw: %f", angle_to_goal, yaw);
    return angle_to_goal - yaw;
 
 }
@@ -194,12 +195,12 @@ void SpotControlReact::moveToGoal(geometry_msgs::PoseStamped goal_pose){
    ROS_INFO("Moving toward goal");
    euclidian_dist = this->euclidian_distance(goal_pose);
    while (at_goal == false){
-        // angular velocity in the z-axis
+        // angle to goal
         steering_ang = steering_angle(goal_pose);
-        // angle tolerance: 3 deg/ 0.05 rad
-        if ( abs(steering_ang) >= 0.05){
+        // angle tolerance: 3 deg/ 0.05 rad, 10 deg/0.17rad
+        if ( abs(steering_ang) >= 0.10){
             lin_vel = 0.0;
-            ang_vel = 0.1;
+            ang_vel = 0.11;
             //ang_vel = this->angular_vel(goal_pose, angular_constant);
             if(steering_ang < 0)
                 ang_vel = -ang_vel;
@@ -221,8 +222,9 @@ void SpotControlReact::moveToGoal(geometry_msgs::PoseStamped goal_pose){
         this->cmd_vel_publisher_.publish(vel_msg);
 
         rate.sleep();
-        ROS_INFO("distance to goal: %f, Steer_ang: %f, Ang_vel: %f", euclidian_dist, steering_ang, ang_vel);
-        ROS_INFO("lin_vel: %f", lin_vel);
+        vel_msg.linear.x = 0.0;
+        vel_msg.angular.z = 0.0;
+        this->cmd_vel_publisher_.publish(vel_msg);
         ros::spinOnce(); // process callbacks once for latest pose data
         euclidian_dist = this->euclidian_distance(goal_pose);
         if(abs(euclidian_dist) <= distance_tolerance){
